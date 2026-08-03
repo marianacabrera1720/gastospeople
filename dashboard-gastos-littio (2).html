@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gasto Total — Littio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #F3F6FB;
+    --surface: #FFFFFF;
+    --surface-2: #F7F9FC;
+    --surface-3: #EDF1F7;
+    --border: #E1E7F0;
+    --border-strong: #CBD4E3;
+    --text: #101827;
+    --text-dim: #58626F;
+    --text-faint: #8B93A1;
+
+    --navy: #101827;
+    --navy-soft: rgba(16,24,39,0.06);
+
+    --lime: #C7EE4B;
+    --lime-ink: #4C5B12;
+    --lime-line: #A9D82E;
+
+    --deel: #2F5D8A;
+    --deel-soft: rgba(47,93,138,0.08);
+    --deel-line: rgba(47,93,138,0.35);
+
+    --good: #1B8F5E;
+    --good-soft: rgba(27,143,94,0.09);
+    --warn: #B4691E;
+    --warn-soft: rgba(180,105,30,0.09);
+    --bad: #B03B32;
+    --bad-soft: rgba(176,59,50,0.09);
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--lime); color: var(--navy); }
+  .wrap{ max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background: var(--navy);
+    color: #fff;
+  }
+  .topbar-inner{
+    max-width: 1180px; margin: 0 auto; padding: 16px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .brand{
+    display:flex; align-items:baseline; gap:10px;
+  }
+  .brand .logo{
+    font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em;
+  }
+  .brand .logo::after{ content:''; }
+  .brand .divider{ width:1px; height:16px; background: rgba(255,255,255,0.25); }
+  .brand .title{ font-size: 14px; color: rgba(255,255,255,0.75); }
+
+  .status-cluster{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .status-pill{
+    display:flex; align-items:center; gap:7px;
+    font-family: var(--font-mono); font-size: 11.5px;
+    padding: 6px 12px; border-radius: 20px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85);
+    white-space:nowrap;
+  }
+  .status-pill .dot{ width:7px; height:7px; border-radius:50%; }
+  .status-pill.live .dot{ background:#3DDC84; box-shadow:0 0 0 3px rgba(61,220,132,0.25); }
+  .status-pill.fallback .dot{ background:#F2B84B; box-shadow:0 0 0 3px rgba(242,184,75,0.25); }
+  .status-pill.loading .dot{ background:#7EC4EC; animation: pulse 1s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  .btn-refresh{
+    font-family: var(--font-body); font-weight:600; font-size: 13px;
+    background: var(--lime); color: var(--navy);
+    border: none; border-radius: 8px; padding: 8px 16px;
+    cursor:pointer; display:flex; align-items:center; gap:7px;
+    transition: transform 0.08s ease;
+  }
+  .btn-refresh:hover{ filter: brightness(0.96); }
+  .btn-refresh:active{ transform: scale(0.97); }
+  .btn-refresh:disabled{ opacity:0.6; cursor:default; }
+  .btn-refresh svg{ width:14px; height:14px; }
+  .btn-refresh.spinning svg{ animation: spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* ---------- Fallback banner ---------- */
+  .fallback-banner{
+    display:none;
+    background: var(--warn-soft);
+    border-bottom: 1px solid rgba(180,105,30,0.2);
+    color: #6b3d10;
+  }
+  .fallback-banner.show{ display:block; }
+  .fallback-banner-inner{
+    max-width:1180px; margin:0 auto; padding: 10px 24px;
+    font-size: 13px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .fallback-banner-inner strong{ font-weight:600; }
+  .fallback-banner-inner a{ color: #6b3d10; text-decoration: underline; }
+  .fallback-banner code{
+    background: rgba(0,0,0,0.06); padding:1px 6px; border-radius:4px; font-family: var(--font-mono); font-size:12px;
+  }
+
+  /* ---------- Header / title ---------- */
+  header.top{ padding: 40px 24px 0; max-width: 1180px; margin: 0 auto; }
+  .eyebrow{
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-faint); margin-bottom: 12px;
+  }
+  h1{
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 3.6vw, 42px);
+    margin: 0 0 8px; letter-spacing: -0.01em; color: var(--navy);
+  }
+  .subtitle{ color: var(--text-dim); font-size: 15px; max-width: 680px; margin: 0 0 28px; }
+
+  /* ---------- Tabs ---------- */
+  .tabnav{
+    display:flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 32px;
+  }
+  .tabbtn{
+    font-family: var(--font-body); font-weight: 600; font-size: 14.5px;
+    background:none; border:none; cursor:pointer;
+    padding: 12px 18px; color: var(--text-faint);
+    border-bottom: 2.5px solid transparent;
+    display:flex; align-items:center; gap:8px;
+    margin-bottom: -1px;
+  }
+  .tabbtn .swatch{ width:9px; height:9px; border-radius:2px; }
+  .tabbtn[data-tab="resumen"].active{ color: var(--navy); border-color: var(--navy); }
+  .tabbtn[data-tab="mercury"].active{ color: var(--navy); border-color: var(--lime-line); }
+  .tabbtn[data-tab="mercury"] .swatch{ background: var(--lime); }
+  .tabbtn[data-tab="deel"].active{ color: var(--navy); border-color: var(--deel); }
+  .tabbtn[data-tab="deel"] .swatch{ background: var(--deel); }
+  .tabbtn:hover{ color: var(--navy); }
+
+  .tabpanel{ display:none; }
+  .tabpanel.active{ display:block; }
+
+  /* ---------- KPI strip ---------- */
+  .kpi-strip{
+    display:grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; margin-bottom: 32px;
+  }
+  .kpi{ background: var(--surface); padding: 20px 20px 18px; }
+  .kpi .label{
+    font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-faint); margin-bottom: 10px;
+  }
+  .kpi .value{
+    font-family: var(--font-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em; color: var(--navy); word-break: break-word;
+  }
+  .kpi .value.lime{ color: var(--lime-ink); }
+  .kpi .value.deel{ color: var(--deel); }
+  .kpi .value.warn{ color: var(--warn); }
+  .kpi .foot{ margin-top: 6px; font-size: 12px; color: var(--text-dim); }
+
+  /* ---------- Reconciliation panel ---------- */
+  .recon{
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px 24px; margin-bottom: 28px;
+  }
+  .recon h3{
+    font-family: var(--font-body); font-weight:700; font-size: 14px; text-transform: uppercase;
+    letter-spacing: 0.03em; color: var(--text); margin: 0 0 4px;
+  }
+  .recon .recon-sub{ font-size: 12.5px; color: var(--text-faint); margin: 0 0 16px; }
+  .recon-row{
+    display:flex; align-items:baseline; justify-content:space-between; gap: 12px;
+    padding: 9px 0; border-bottom: 1px dashed var(--border);
+    font-size: 14px;
+  }
+  .recon-row:last-child{ border-bottom:none; }
+  .recon-row .rl{ color: var(--text-dim); }
+  .recon-row .rl .tag{
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint);
+    background: var(--surface-3); padding:1px 7px; border-radius: 4px; margin-left: 8px;
+  }
+  .recon-row .rv{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); white-space:nowrap; }
+  .recon-row.total{ font-weight:700; }
+  .recon-row.total .rv{ font-size: 16px; color: var(--navy); }
+  .recon-row.exclude .rv{ color: var(--bad); }
+
+  /* ---------- Module / cards ---------- */
+  .module{ margin-bottom: 48px; }
+  .module-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px;
+    margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .module-head .name{
+    display:flex; align-items:center; gap:10px;
+    font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--navy);
+  }
+  .swatch{ width:10px; height:10px; border-radius: 2px; }
+  .swatch.mercury{ background: var(--lime); }
+  .swatch.deel{ background: var(--deel); }
+  .module-head .meta{ font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
+
+  .grid-2{ display:grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card{
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px;
+  }
+  .card h3{
+    font-family: var(--font-body); font-weight: 700; font-size: 12.5px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--text-dim); margin: 0 0 16px;
+  }
+  .chart-box{ position:relative; height: 250px; }
+  .chart-box.tall{ height: 300px; }
+
+  /* Ledger list */
+  .ledger{ display:flex; flex-direction:column; gap:12px; }
+  .ledger-row{ display:flex; align-items:baseline; gap: 8px; font-size: 13.5px; }
+  .ledger-row .name{ color: var(--text); white-space:nowrap; }
+  .ledger-row .fill{ flex:1; border-bottom: 1px dotted var(--border-strong); transform: translateY(-4px); }
+  .ledger-row .amt{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); white-space:nowrap; }
+  .ledger-row .bar-bg{ position:relative; height:5px; background: var(--surface-3); border-radius: 3px; margin-top: 5px; overflow:hidden; }
+  .ledger-row .bar-fill{ position:absolute; inset:0; border-radius:3px; }
+
+  /* ---------- Table controls ---------- */
+  .table-controls{ display:flex; flex-wrap:wrap; gap: 10px; margin-bottom: 14px; }
+  .table-controls input[type="search"], .table-controls select{
+    background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text);
+    font-family: var(--font-body); font-size: 13.5px; padding: 9px 12px; border-radius: 8px; outline: none;
+  }
+  .table-controls input[type="search"]{ min-width: 220px; flex: 1; }
+  .table-controls select{ cursor:pointer; }
+  .table-controls input:focus, .table-controls select:focus{ border-color: var(--deel-line); }
+  .count-tag{ font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); align-self:center; margin-left: auto; padding-right: 4px; }
+
+  .table-wrap{ border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-scroll{ max-height: 420px; overflow-y: auto; }
+  table{ width:100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th{
+    position: sticky; top:0; background: var(--surface-3); text-align:left; padding: 11px 14px;
+    font-family: var(--font-mono); font-size: 10.5px; text-transform:uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); cursor:pointer; user-select:none; border-bottom: 1px solid var(--border-strong); white-space:nowrap;
+  }
+  thead th:hover{ color: var(--navy); }
+  thead th.sorted::after{ content:" ▾"; font-size:9px; }
+  thead th.sorted.asc::after{ content:" ▴"; font-size:9px; }
+  tbody td{ padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); white-space:nowrap; }
+  tbody tr:hover{ background: var(--surface-2); }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.num{ font-family: var(--font-mono); text-align:right; font-variant-numeric: tabular-nums; }
+  td.desc{ max-width: 220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pill{ display:inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-family: var(--font-mono); }
+  .pill.sent, .pill.paid{ background: var(--good-soft); color: var(--good); }
+  .pill.failed{ background: var(--bad-soft); color: var(--bad); }
+  .empty-row td{ text-align:center; color: var(--text-faint); padding: 32px; font-family: var(--font-mono); font-size: 13px; }
+  tfoot td{
+    padding: 11px 14px; font-family: var(--font-mono); font-weight:600; background: var(--surface-3);
+    border-top: 1px solid var(--border-strong); font-variant-numeric: tabular-nums;
+  }
+
+  .compare-note{ font-size: 13px; color: var(--text-dim); margin: -8px 0 16px; }
+
+  /* ---------- Notes / methodology ---------- */
+  .notes{
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; font-size: 13px; color: var(--text-dim);
+  }
+  .notes h3{ font-size: 12.5px; text-transform:uppercase; letter-spacing:0.05em; color: var(--text); margin:0 0 12px; font-weight:700;}
+  .notes ul{ margin: 0; padding-left: 18px; }
+  .notes li{ margin-bottom: 8px; }
+  .notes li:last-child{ margin-bottom:0; }
+  .notes code{ background: var(--surface-3); padding:1px 6px; border-radius:4px; font-family: var(--font-mono); font-size:12px; color: var(--text); }
+  .notes a{ color: var(--deel); }
+
+  footer{
+    text-align:center; color: var(--text-faint); font-size: 12px; font-family: var(--font-mono);
+    padding: 24px 0; border-top: 1px dashed var(--border); margin-top: 8px;
+  }
+  footer a{ color: var(--text-dim); }
+
+  @media (max-width: 860px){
+    .kpi-strip{ grid-template-columns: repeat(2,1fr); }
+    .grid-2{ grid-template-columns: 1fr; }
+    .topbar-inner{ flex-direction:column; align-items:flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce){ *{ animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="logo">littio</span>
+      <span class="divider"></span>
+      <span class="title">Finanzas · Gasto Total</span>
+    </div>
+    <div class="status-cluster">
+      <span class="status-pill loading" id="statusPill"><span class="dot"></span><span id="statusText">Conectando…</span></span>
+      <button class="btn-refresh" id="refreshBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        Actualizar datos
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="fallback-banner" id="fallbackBanner">
+  <div class="fallback-banner-inner">
+    <span>⚠️</span>
+    <span><strong>Mostrando copia local</strong> del <span id="fallbackDate"></span> — no se pudo conectar en vivo con Google Sheets.</span>
+    <span id="fallbackReason"></span>
+    <span>Para habilitar la actualización automática, aloja este archivo en un servidor web (ej. arrastra la carpeta a <a href="https://app.netlify.com/drop" target="_blank" rel="noopener">netlify.com/drop</a>) en vez de abrirlo con doble clic.</span>
+  </div>
+</div>
+
+<header class="top">
+  <div class="eyebrow" id="lastUpdatedLine">ÚLTIMA ACTUALIZACIÓN · —</div>
+  <h1>Gasto total Littio - People</h1>
+  <p class="subtitle">Consolidado de gastos con tarjeta corporativa (Mercury) y pagos a contratistas (Deel). Todos los montos en USD.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="tabnav">
+    <button class="tabbtn active" data-tab="resumen">Resumen combinado</button>
+    <button class="tabbtn" data-tab="mercury"><span class="swatch"></span> Mercury (tarjeta)</button>
+    <button class="tabbtn" data-tab="deel"><span class="swatch"></span> Deel (contratistas)</button>
+  </div>
+
+  <!-- ============ RESUMEN TAB ============ -->
+  <section class="tabpanel active" id="tab-resumen">
+    <div class="kpi-strip" id="kpiStripResumen"></div>
+
+    <div class="recon" id="reconPanel"></div>
+
+    <div class="module">
+      <div class="module-head">
+        <div class="name">Comparativa mensual</div>
+        <div class="meta">Escalas independientes — eje izquierdo Mercury, eje derecho Deel</div>
+      </div>
+      <p class="compare-note">Los dos flujos de gasto operan en escalas muy distintas (miles vs. cientos de miles de USD). Se grafican con ejes independientes para comparar la forma de la tendencia, no la magnitud absoluta.</p>
+      <div class="card">
+        <div class="chart-box tall"><canvas id="compareChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="notes" id="methodologyNotes"></div>
+  </section>
+
+  <!-- ============ MERCURY TAB ============ -->
+  <section class="tabpanel" id="tab-mercury">
+    <div class="module-head">
+      <div class="name"><span class="swatch mercury"></span> Gastos con tarjeta · Mercury</div>
+      <div class="meta" id="mercuryMeta"></div>
+    </div>
+
+    <div class="kpi-strip" id="kpiStripMercury"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Tendencia mensual</h3>
+        <div class="chart-box"><canvas id="mercuryTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Gasto por categoría (transacciones enviadas)</h3>
+        <div class="ledger" id="mercuryCategoryLedger"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Top tipos de comercio</h3>
+        <div class="chart-box"><canvas id="mercuryMerchants"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Estado de transacciones</h3>
+        <div class="chart-box"><canvas id="mercuryStatus"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Detalle de transacciones (137 registros — incluye enviadas y fallidas)</h3>
+      <div class="table-controls">
+        <input type="search" id="mercurySearch" placeholder="Buscar por descripción...">
+        <select id="mercuryCategoryFilter"></select>
+        <select id="mercuryStatusFilter">
+          <option value="">Todos los estados</option>
+          <option value="Sent">Sent</option>
+          <option value="Failed">Failed</option>
+        </select>
+        <span class="count-tag" id="mercuryCount"></span>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table id="mercuryTable">
+            <thead>
+              <tr>
+                <th data-key="date" data-type="text">Fecha</th>
+                <th data-key="description" data-type="text">Descripción</th>
+                <th data-key="category" data-type="text">Categoría</th>
+                <th data-key="merchantType" data-type="text">Tipo de comercio</th>
+                <th data-key="currency" data-type="text">Moneda original</th>
+                <th data-key="status" data-type="text">Estado</th>
+                <th data-key="amount" data-type="num" class="sorted asc">Monto (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="mercuryTbody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6">Suma visible (según filtro aplicado)</td>
+                <td class="num" id="mercuryTableSum">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DEEL TAB ============ -->
+  <section class="tabpanel" id="tab-deel">
+    <div class="module-head">
+      <div class="name"><span class="swatch deel"></span> Pagos a contratistas · Deel</div>
+      <div class="meta" id="deelMeta"></div>
+    </div>
+
+    <div class="kpi-strip" id="kpiStripDeel"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Tendencia mensual de pagos</h3>
+        <div class="chart-box"><canvas id="deelTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Composición del pago (total del periodo)</h3>
+        <div class="ledger" id="deelCompositionLedger"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Detalle de statements</h3>
+      <div class="table-controls">
+        <input type="search" id="deelSearch" placeholder="Buscar por ID o fecha...">
+        <select id="deelStatusFilter"><option value="">Todos los estados</option></select>
+        <span class="count-tag" id="deelCount"></span>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table id="deelTable">
+            <thead>
+              <tr>
+                <th data-key="date" data-type="text">Fecha de pago</th>
+                <th data-key="id" data-type="text">Statement</th>
+                <th data-key="currency" data-type="text">Moneda</th>
+                <th data-key="contractorInvoices" data-type="num">Contratistas (USD)</th>
+                <th data-key="deelServices" data-type="num">Deel Services (USD)</th>
+                <th data-key="paymentMethodFee" data-type="num">Fee método pago</th>
+                <th data-key="status" data-type="text">Estado</th>
+                <th data-key="amount" data-type="num" class="sorted asc">Total (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="deelTbody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="7">Suma visible (según filtro aplicado)</td>
+                <td class="num" id="deelTableSum">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Fuentes: Google Sheets "Gastos People" (Mercury) y "Deel Payments". Verificar cifras contra los Sheets originales ante cualquier duda.
+  </footer>
+</div>
+
+<script>
+const FALLBACK_GASTOS_CSV = "Date (UTC),Description,Amount,Status,Source Account,Bank Description,Reference,Note,Last Four Digits,Name On Card,Merchant Type,Category,Source of Category,GL Code,Source of GL Code,Original Currency,Check Number,Tags,Cardholder Email,Tracking ID,Failure Reason\n30/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n24/07/26,Intl. Transaction Fee,\"-$8,43\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Mercado Pago*ishopcolo,\"-$281,15\",Sent,Mercury Credit,MERCADO PAGO*ISHOPCOLO,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,\n24/07/26,Mercado Pago*maccenter,\"-$874,48\",Sent,Mercury Credit,MERCADO PAGO*MACCENTER,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,\n24/07/26,Intl. Transaction Fee,\"-$26,23\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Intl. Transaction Fee,\"-$19,39\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Mercado Pago*maccenter,\"-$646,40\",Sent,Mercury Credit,MERCADO PAGO*MACCENTER,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,\n24/07/26,Mercado Pago*maccenter,\"-$512,06\",Sent,Mercury Credit,MERCADO PAGO*MACCENTER,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,\n24/07/26,Intl. Transaction Fee,\"-$15,36\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Mercado Pago*ishopcolo,\"-$1.674,28\",Sent,Mercury Credit,MERCADO PAGO*ISHOPCOLO,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,\n24/07/26,Intl. Transaction Fee,\"-$50,23\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Intl. Transaction Fee,\"-$8,40\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n24/07/26,Avianca,\"-$279,99\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n23/07/26,Intl. Transaction Fee,\"-$13,74\",Failed,Mercury Credit,,,,,,FinancialInstitutionsAndFees,,,,,,,,,,This transaction failed because it exceeded the spend limit for the card.\n23/07/26,Mercado Pago*maccenter,\"-$458,03\",Failed,Mercury Credit,MERCADO PAGO*MACCENTER,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,This transaction failed because it exceeded the spend limit for the card.\n23/07/26,Intl. Transaction Fee,\"-$13,74\",Failed,Mercury Credit,,,,,,FinancialInstitutionsAndFees,,,,,,,,,,This transaction failed because it exceeded the spend limit for the card.\n23/07/26,Mercado Pago*maccenter,\"-$458,03\",Failed,Mercury Credit,MERCADO PAGO*MACCENTER,,,2486,Sofia Diaz-Granados,Retail,,,,,COP,,,sofia.diazgranados@littio.co,,This transaction failed because it exceeded the spend limit for the card.\n23/07/26,Booking.com,\"-$649,17\",Sent,Mercury Credit,BKG*BOOKING.COM FLIGHT,,,2486,Sofia Diaz-Granados,OtherTravel,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n23/07/26,Avianca,\"-$2.281,58\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n23/07/26,Intl. Transaction Fee,\"-$68,45\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n18/07/26,British Airways,\"-$1.470,76\",Sent,Mercury Credit,BRITISH AIRWAYS PLC,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,EUR,,,sofia.diazgranados@littio.co,,\n18/07/26,Intl. Transaction Fee,\"-$44,12\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n16/07/26,Bold Sa*granel G,\"-$40,74\",Sent,Mercury Credit,BOLD SA*GRANEL G,,,2486,Sofia Diaz-Granados,Grocery,Business Meals,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n15/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n10/07/26,Amazon,\"-$542,63\",Sent,Mercury Credit,AMAZON MKTPLACE PMTS,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n10/07/26,Bold Sa*taxi,\"-$157,11\",Sent,Mercury Credit,BOLD SA*TAXI,,,2486,Sofia Diaz-Granados,GroundTransportation,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n10/07/26,Amazon,\"-$78,43\",Sent,Mercury Credit,AMAZON MKTPLACE PMTS,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n09/07/26,Intl. Transaction Fee,\"-$58,06\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n09/07/26,Avianca,\"-$1.935,37\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,EUR,,,sofia.diazgranados@littio.co,,\n07/07/26,Bold Sa*domenica,\"-$1.332,00\",Sent,Mercury Credit,BOLD SA*DOMENICA,,,2486,Sofia Diaz-Granados,Clothing,,,,,USD,,,sofia.diazgranados@littio.co,,\n04/07/26,Intl. Transaction Fee,\"-$29,65\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n04/07/26,Latam Air*0000,\"-$988,33\",Sent,Mercury Credit,LATAM AIR*0000,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,BRL,,,sofia.diazgranados@littio.co,,\n04/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n03/07/26,Rappi,\"-$70,36\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n03/07/26,Intl. Transaction Fee,\"-$2,11\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n02/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n02/07/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n01/07/26,BOLD*Granel Gourmet,\"-$36,37\",Sent,Mercury Credit,BOLD*Granel Gourmet,,,2486,Sofia Diaz-Granados,Grocery,Business Meals,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n01/07/26,Intl. Transaction Fee,\"-$1,09\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n30/06/26,Intl. Transaction Fee,\"-$65,59\",Failed,Mercury Credit,,,,,,FinancialInstitutionsAndFees,,,,,,,,,,\"To help keep your account secure, we blocked this transaction.\"\n30/06/26,Iberia,\"-$2.186,25\",Failed,Mercury Credit,IBERIA LAE SA OPERADOR,,,2486,Sofia Diaz-Granados,Airlines,,,,,EUR,,,sofia.diazgranados@littio.co,,\"To help keep your account secure, we blocked this transaction.\"\n30/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n30/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n25/06/26,Time to Hire,\"-$99,00\",Sent,Mercury Credit,TIME TO HIRE,,,2486,Sofia Diaz-Granados,Software,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n25/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n23/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n23/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n19/06/26,Bold Sa*domenica,\"-$1.478,14\",Sent,Mercury Credit,BOLD SA*DOMENICA,,,2486,Sofia Diaz-Granados,Clothing,,,,,USD,,,sofia.diazgranados@littio.co,,\n17/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n10/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n06/06/26,Amazon,\"-$50,00\",Sent,Mercury Credit,Amazon.com,,,2486,Sofia Diaz-Granados,Retail,,,,,USD,,,sofia.diazgranados@littio.co,,\n05/06/26,Intl. Transaction Fee,\"-$1,05\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n05/06/26,BOLD*Granel Gourmet,\"-$35,16\",Sent,Mercury Credit,BOLD*Granel Gourmet,,,2486,Sofia Diaz-Granados,Grocery,Business Meals,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n31/05/26,Uber,\"-$2,77\",Sent,Mercury Credit,UBER *TRIP HELP.UBER.C,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n31/05/26,Intl. Transaction Fee,\"-$0,08\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n26/05/26,Time to Hire,\"-$207,00\",Sent,Mercury Credit,TIME TO HIRE,,,2486,Sofia Diaz-Granados,Software,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n25/05/26,Time to Hire,\"-$99,00\",Sent,Mercury Credit,TIME TO HIRE,,,2486,Sofia Diaz-Granados,Software,Office Supplies & Equipment,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n17/05/26,Valero Energy,\"-$60,72\",Sent,Mercury Credit,VALERO UNIVERSITY BERK,,,2486,Sofia Diaz-Granados,FuelAndGas,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n12/05/26,Apple,\"-$1.881,40\",Sent,Mercury Credit,APPLE STORE #R057,,,2486,Sofia Diaz-Granados,Electronics,Marketing & Advertising,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n09/05/26,Uber,\"-$10,30\",Sent,Mercury Credit,UBER *TRIP,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n08/05/26,Uber,\"-$8,28\",Sent,Mercury Credit,UBER *TRIP,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n06/05/26,Instacart,\"-$293,81\",Sent,Mercury Credit,IC* INSTACART*1102,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n06/05/26,Cathay Pacific,\"$296,52\",Sent,Mercury Credit,CATHAYPA6000000000000,,,2486,Sofia Diaz-Granados,Airlines,,,,,IDR,,,sofia.diazgranados@littio.co,,\n04/05/26,Chevron,\"-$51,16\",Sent,Mercury Credit,CHEVRON 0094800,,,2486,Sofia Diaz-Granados,FuelAndGas,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n03/05/26,Emirates,\"-$853,90\",Sent,Mercury Credit,EMIRATES AIRLINE USD 3,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n02/05/26,Uber,\"-$48,98\",Sent,Mercury Credit,UBER * PENDING,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n28/04/26,Trader Joe's,\"-$149,12\",Sent,Mercury Credit,TRADER JOE S #072,,,2486,Sofia Diaz-Granados,Grocery,,,,,USD,,,sofia.diazgranados@littio.co,,\n26/04/26,Uber,\"-$35,93\",Sent,Mercury Credit,UBER * PENDING,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n25/04/26,Time to Hire,\"-$99,00\",Sent,Mercury Credit,TIME TO HIRE,,,2486,Sofia Diaz-Granados,Software,Office Supplies & Equipment,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n24/04/26,Instacart,\"-$232,62\",Sent,Mercury Credit,IC* INSTACART*1102,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n24/04/26,Uber,\"-$59,93\",Sent,Mercury Credit,UBER * PENDING,,,2486,Sofia Diaz-Granados,RideshareAndTaxis,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n23/04/26,Instacart,\"-$812,53\",Sent,Mercury Credit,IC* INSTACART*1102,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n22/04/26,Instacart,\"$0,00\",Failed,Mercury Credit,IC* INSTACART*1102,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\"The merchant canceled this transaction, possibly due to incorrect billing information.\"\n22/04/26,Instacart,\"-$57,90\",Sent,Mercury Credit,IC* INSTACART,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n20/04/26,Instacart,\"-$587,53\",Sent,Mercury Credit,IC* INSTACART*1102,,,2486,Sofia Diaz-Granados,FoodDelivery,Business Meals,Manual Input,,,USD,,,sofia.diazgranados@littio.co,,\n19/04/26,Intl. Transaction Fee,\"-$4,81\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n19/04/26,Avianca,\"-$160,36\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n19/04/26,Intl. Transaction Fee,\"-$0,22\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n19/04/26,Rappi,\"-$7,49\",Sent,Mercury Credit,RAPPI,,,2486,Sofia Diaz-Granados,Retail,Business Meals,Suggested by Mercury,,,ARS,,,sofia.diazgranados@littio.co,,\n15/04/26,Glovo,\"-$31,50\",Sent,Mercury Credit,Glovo 14APR MAGLKALJ,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,EUR,,,sofia.diazgranados@littio.co,,\n15/04/26,Intl. Transaction Fee,\"-$0,94\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n14/04/26,Cathay Pacific,\"-$1.753,25\",Sent,Mercury Credit,CATHAY PACIFIC LTD,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,IDR,,,sofia.diazgranados@littio.co,,\n14/04/26,Intl. Transaction Fee,\"-$52,60\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n13/04/26,Intl. Transaction Fee,\"-$28,15\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n13/04/26,Avianca,\"-$938,37\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n13/04/26,United Airlines,\"-$53,99\",Sent,Mercury Credit,UNITED,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,USD,,,sofia.diazgranados@littio.co,,\n12/04/26,Avianca,\"-$807,54\",Sent,Mercury Credit,AVIANCA,,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n12/04/26,Intl. Transaction Fee,\"-$24,23\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n12/04/26,United Airlines,\"-$1.983,65\",Sent,Mercury Credit,\"UNITED AIRLINES, INC.\",,,2486,Sofia Diaz-Granados,Airlines,Travel & Transportation,Suggested by Mercury,,,BRL,,,sofia.diazgranados@littio.co,,\n12/04/26,Intl. Transaction Fee,\"-$59,51\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n08/04/26,Intl. Transaction Fee,\"-$6,31\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n08/04/26,Cloudworks,\"-$210,47\",Sent,Mercury Credit,CLOUDWORKS,,,2486,Sofia Diaz-Granados,ProfessionalServices,Software & Subscriptions,Suggested by Mercury,,,EUR,,,sofia.diazgranados@littio.co,,\n31/03/26,Alkosto-Ktronix Intern,\"-$518,73\",Sent,Mercury Credit,ALKOSTO-KTRONIX INTERN,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n31/03/26,Intl. Transaction Fee,\"-$15,56\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n31/03/26,Falabella Com S a S,\"-$617,28\",Sent,Mercury Credit,FALABELLA COM S A S,,,2486,Sofia Diaz-Granados,Retail,Inventory & Materials,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n31/03/26,Intl. Transaction Fee,\"-$18,52\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n25/03/26,Time to Hire,\"-$99,00\",Sent,Mercury Credit,TIME TO HIRE,,,2486,Sofia Diaz-Granados,Software,,,,,USD,,,sofia.diazgranados@littio.co,,\n19/03/26,Mercado Pago*mercadoli,\"-$116,82\",Sent,Mercury Credit,MERCADO PAGO*MERCADOLI,,,2486,Sofia Diaz-Granados,Software,,,,,COP,,,sofia.diazgranados@littio.co,,\n19/03/26,Intl. Transaction Fee,\"-$3,50\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n11/03/26,Intl. Transaction Fee,\"-$27,52\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n11/03/26,Mercado Pago*mipcequip,\"-$917,35\",Sent,Mercury Credit,MERCADO PAGO*MIPCEQUIP,,,2486,Sofia Diaz-Granados,Software,Office Supplies & Equipment,Manual Input,,,COP,,,sofia.diazgranados@littio.co,,\n08/03/26,Intl. Transaction Fee,\"-$1,36\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n08/03/26,Rappi,\"-$45,29\",Sent,Mercury Credit,RAPPI *WEDO4U,,,2486,Sofia Diaz-Granados,OtherTravel,Business Meals,Suggested by Mercury,,,BRL,,,sofia.diazgranados@littio.co,,\n06/03/26,Falabella Com S a S,\"-$96,27\",Sent,Mercury Credit,FALABELLA COM S A S,,,2486,Sofia Diaz-Granados,Retail,Inventory & Materials,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n06/03/26,Intl. Transaction Fee,\"-$2,89\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n05/03/26,Merpago*lostesorosfrut,\"-$25,76\",Sent,Mercury Credit,MERPAGO*LOSTESOROSFRUT,,,2486,Sofia Diaz-Granados,Retail,Employee Benefits,Suggested by Mercury,,,CLP,,,sofia.diazgranados@littio.co,,\n05/03/26,Intl. Transaction Fee,\"-$0,77\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n05/03/26,FALABELLA COM S A S,\"$98,33\",Sent,Mercury Credit,FALABELLA COM S A S,,,2486,Sofia Diaz-Granados,,Revenue,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n27/02/26,Falabella Com S a S,\"-$100,07\",Sent,Mercury Credit,FALABELLA COM S A S,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Manual Input,,,COP,,,sofia.diazgranados@littio.co,,\n27/02/26,Intl. Transaction Fee,\"-$3,00\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n06/02/26,Intl. Transaction Fee,\"-$1,07\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n06/02/26,Mercado Pago*pepeganga,\"-$35,69\",Sent,Mercury Credit,MERCADO PAGO*PEPEGANGA,,,2486,Sofia Diaz-Granados,Shipping,Office Supplies & Equipment,Manual Input,,,COP,,,sofia.diazgranados@littio.co,,\n27/01/26,Intl. Transaction Fee,\"-$2,07\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n27/01/26,Falabella Com S a S,\"-$68,99\",Sent,Mercury Credit,FALABELLA COM S A S,,,2486,Sofia Diaz-Granados,Retail,Office Supplies & Equipment,Manual Input,,,COP,,,sofia.diazgranados@littio.co,,\n25/12/25,Intl. Transaction Fee,\"-$0,34\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n25/12/25,Rappi,\"-$11,41\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Intl. Transaction Fee,\"-$0,70\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Rappi,\"-$23,34\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Rappi,\"-$30,51\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Intl. Transaction Fee,\"-$0,92\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Rappi,\"-$46,88\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Intl. Transaction Fee,\"-$1,41\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Rappi,\"-$10,16\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Intl. Transaction Fee,\"-$0,30\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Intl. Transaction Fee,\"-$1,32\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Rappi,\"-$44,01\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n18/12/25,Intl. Transaction Fee,\"-$0,25\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n18/12/25,Rappi,\"-$8,21\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n17/12/25,Rappi,\"-$35,79\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n17/12/25,Intl. Transaction Fee,\"-$1,07\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n17/12/25,Rappi,\"$35,79\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n17/12/25,Rappi,\"-$65,57\",Sent,Mercury Credit,Rappi,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,CAD,,,sofia.diazgranados@littio.co,,\n17/12/25,Intl. Transaction Fee,\"-$1,97\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,\n16/12/25,Rappi,\"-$59,49\",Sent,Mercury Credit,RAPPI COLOMBIA*DL,,,2486,Sofia Diaz-Granados,Shipping,Business Meals,Suggested by Mercury,,,COP,,,sofia.diazgranados@littio.co,,\n16/12/25,Intl. Transaction Fee,\"-$1,78\",Sent,Mercury Credit,,,,,,FinancialInstitutionsAndFees,Bank Fees,Suggested by Mercury,,,,,,,,";
+const FALLBACK_DEEL_CSV = "Statement Document Identifier,Legal Entity Name,Client Payment Date,Payment Currency,Amount (USD),Employee Invoices Total (USD),Contractor Invoices Total (USD),Deel Services Invoices Total (USD),Amount Paid via Payment Method,Amount Paid via General Funds,Fee Credit Applied (Invoice Currency),Payment Method Fee,Deel Fee (USD),Payment Method Names,Payment Statement Status (Admin)\nREC-2026-25,\"Littio, Inc.\",\"Jul 27, 2026\",USD,\"1993,75\",0,\"1968,75\",30,\"1998,75\",0,0,5,0,,paid\nREC-2026-24,\"Littio, Inc.\",\"Jul 25, 2026\",USD,\"267178,89\",0,\"265709,24\",2849,\"268073,24\",0,485,5,0,,paid\nREC-2026-23,\"Littio, Inc.\",\"Jul 17, 2026\",USD,20000,0,20000,5,20005,0,0,5,0,,paid\nREC-2026-22,\"Littio, Inc.\",\"Jul 01, 2026\",USD,\"101,06\",0,\"108,16\",5,\"113,16\",0,0,5,0,,paid\nREC-2026-21,\"Littio, Inc.\",\"Jun 25, 2026\",USD,\"240430,8\",0,\"239066,36\",2466,\"240366,36\",0,1166,5,0,,paid\nREC-2026-20,\"Littio, Inc.\",\"Jun 05, 2026\",USD,400,0,400,5,405,0,0,5,0,,paid\nREC-2026-19,\"Littio, Inc.\",\"May 27, 2026\",USD,\"3237,5\",0,\"3237,5\",5,\"3242,5\",0,0,5,0,,paid\nREC-2026-18,\"Littio, Inc.\",\"May 25, 2026\",USD,\"221593,23\",0,\"220032,05\",2324,\"221332,05\",0,1024,5,0,,paid\nREC-2026-17,\"Littio, Inc.\",\"May 08, 2026\",USD,75,0,50,30,55,0,25,5,0,,paid\nREC-2026-16,\"Littio, Inc.\",\"Apr 30, 2026\",USD,795,0,0,800,800,0,0,5,0,,paid\nREC-2026-15,\"Littio, Inc.\",\"Apr 29, 2026\",USD,\"100,36\",0,\"110,24\",5,\"115,24\",0,0,5,0,,paid\nREC-2026-13,\"Littio, Inc.\",\"Apr 26, 2026\",USD,3150,0,3150,5,3155,0,0,5,0,,paid\nREC-2026-14,\"Littio, Inc.\",\"Apr 25, 2026\",USD,\"206527,2\",0,\"205854,34\",1455,\"207309,34\",0,0,5,0,,paid\nREC-2026-12,\"Littio, Inc.\",\"Apr 03, 2026\",USD,2965,0,0,2970,2970,0,0,5,0,,paid\nREC-2026-11,\"Littio, Inc.\",\"Mar 27, 2026\",USD,\"202941,89\",0,\"202041,49\",1430,\"203471,49\",0,0,5,0,,paid\nREC-2026-10,\"Littio, Inc.\",\"Mar 24, 2026\",USD,15000,0,15000,5,15005,0,0,5,0,,paid\nREC-2026-8,\"Littio, Inc.\",\"Feb 28, 2026\",USD,10000,0,10000,5,10005,0,0,5,0,,paid\nREC-2026-9,\"Littio, Inc.\",\"Feb 28, 2026\",USD,\"194673,85\",0,\"194706,51\",530,\"195236,51\",0,0,5,0,,paid\nREC-2026-7,\"Littio, Inc.\",\"Feb 19, 2026\",USD,825,0,0,830,830,0,0,5,0,,paid\nREC-2026-6,\"Littio, Inc.\",\"Feb 06, 2026\",USD,\"7243,75\",0,\"7218,75\",30,\"7248,75\",0,0,5,0,,paid\nREC-2026-2,\"Littio, Inc.\",\"Jan 30, 2026\",USD,\"328,5\",0,\"328,5\",5,\"333,5\",0,0,5,0,,paid\nREC-2026-3,\"Littio, Inc.\",\"Jan 30, 2026\",USD,\"157367,63\",0,\"157437,31\",505,\"157942,31\",0,0,5,0,,paid\nREC-2026-4,\"Littio, Inc.\",\"Jan 30, 2026\",USD,5530,0,5530,5,5535,0,0,5,0,,paid\nREC-2026-5,\"Littio, Inc.\",\"Jan 30, 2026\",USD,40000,0,40000,5,40005,0,0,5,0,,paid\nREC-2026-1,\"Littio, Inc.\",\"Jan 26, 2026\",USD,181,0,181,5,186,0,0,5,0,,paid\nREC-2025-46,\"Littio, Inc.\",\"Dec 30, 2025\",USD,\"155994,88\",0,\"155050,15\",1455,\"156505,15\",0,0,5,0,,paid\nREC-2025-47,\"Littio, Inc.\",\"Dec 30, 2025\",USD,\"985,1\",0,\"985,1\",5,\"990,1\",0,0,5,0,,paid\nREC-2025-45,\"Littio, Inc.\",\"Dec 12, 2025\",USD,5830,0,0,5835,5835,0,0,5,0,,paid\nREC-2025-44,\"Littio, Inc.\",\"Dec 09, 2025\",USD,74,0,49,30,79,0,0,5,0,,paid\nREC-2025-41,\"Littio, Inc.\",\"Dec 02, 2025\",USD,203,0,178,30,208,0,0,5,0,,paid\nREC-2025-42,\"Littio, Inc.\",\"Dec 02, 2025\",USD,2000,0,0,2005,2005,0,0,5,0,,paid\nREC-2025-43,\"Littio, Inc.\",\"Dec 02, 2025\",USD,\"780,06\",0,\"676,32\",155,\"831,32\",0,0,5,0,,paid";
+const FALLBACK_SNAPSHOT_DATE = "2026-08-03";
+
+</script>
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const GASTOS_SHEET_ID = "1liScSGOAnSkrvvjLLdUG2L75SjdKByiGg1OXUF5u88w";
+const GASTOS_GID = "0";
+const DEEL_SHEET_ID = "1vziJZir98bFFPkTFb2wv7qS4NrShmraX6zmBG24AcAo";
+const DEEL_GID = "0";
+const GASTOS_SHEET_URL = `https://docs.google.com/spreadsheets/d/${GASTOS_SHEET_ID}/edit`;
+const DEEL_SHEET_URL = `https://docs.google.com/spreadsheets/d/${DEEL_SHEET_ID}/edit`;
+
+function csvUrl(id, gid){
+  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+}
+
+// ============================================================
+// CSV PARSER (robust: handles quoted fields with embedded commas)
+// ============================================================
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i], next = text[i+1];
+    if (inQuotes){
+      if (c === '"' && next === '"'){ field += '"'; i++; }
+      else if (c === '"'){ inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* skip */ }
+      else if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const header = rows[0];
+  return rows.slice(1).filter(r => r.some(v => v !== '')).map(r => {
+    const obj = {};
+    header.forEach((h, idx) => { if (h) obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+    return obj;
+  });
+}
+
+// ============================================================
+// NUMBER / DATE HELPERS
+// ============================================================
+function parseAmountEU(s){
+  // Handles formats like "-$1.234,56", "1993,75", "-$50,00"
+  if (s === null || s === undefined) return 0;
+  s = String(s).trim();
+  if (!s) return 0;
+  const neg = s.startsWith('-');
+  s = s.replace(/-/g,'').replace(/\$/g,'').trim();
+  // remove thousands separators (.) then swap decimal comma to dot
+  s = s.replace(/\./g,'').replace(/,/g,'.');
+  const v = parseFloat(s);
+  if (isNaN(v)) return 0;
+  return neg ? -v : v;
+}
+function parseDateDMY(s){
+  // "30/07/26" -> "2026-07-30"
+  const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return String(s).trim();
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = '20' + y;
+  return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+}
+const MONTHS3 = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+function parseDateMonDY(s){
+  // "Jul 27, 2026" -> "2026-07-27"
+  const m = String(s).trim().match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (!m) return String(s).trim();
+  const [, mon, d, y] = m;
+  const mo = MONTHS3[mon] || '01';
+  return `${y}-${mo}-${d.padStart(2,'0')}`;
+}
+const fmtUSD = (n) => {
+  const abs = Math.abs(n);
+  return (n < 0 ? '-$' : '$') + abs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+};
+const fmtAxis = (n) => {
+  const abs = Math.abs(n);
+  return (n < 0 ? '-$' : '$') + Math.round(abs).toLocaleString('en-US');
+};
+const monthLabel = (ym) => {
+  const [y,m] = ym.split('-');
+  const names = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return names[parseInt(m,10)-1] + " '" + y.slice(2);
+};
+const ymOf = (isoDate) => isoDate.slice(0,7);
+
+// ============================================================
+// NORMALIZERS (no PII fields kept: name on card / cardholder email excluded)
+// ============================================================
+function normalizeGastos(rows){
+  return rows.map(r => ({
+    date: parseDateDMY(r['Date (UTC)']),
+    description: (r['Description']||'').trim(),
+    amount: parseAmountEU(r['Amount']),
+    status: (r['Status']||'').trim(),
+    merchantType: (r['Merchant Type']||'').trim() || 'Sin especificar',
+    category: (r['Category']||'').trim() || 'Sin categoría',
+    currency: (r['Original Currency']||'').trim() || 'N/A',
+    failureReason: (r['Failure Reason']||'').trim(),
+  })).sort((a,b) => b.date.localeCompare(a.date));
+}
+function normalizeDeel(rows){
+  return rows.map(r => ({
+    id: (r['Statement Document Identifier']||'').trim(),
+    date: parseDateMonDY(r['Client Payment Date']),
+    entity: (r['Legal Entity Name']||'').trim(),
+    currency: (r['Payment Currency']||'').trim(),
+    amount: parseAmountEU(r['Amount (USD)']),
+    employeeInvoices: parseAmountEU(r['Employee Invoices Total (USD)']),
+    contractorInvoices: parseAmountEU(r['Contractor Invoices Total (USD)']),
+    deelServices: parseAmountEU(r['Deel Services Invoices Total (USD)']),
+    paymentMethodFee: parseAmountEU(r['Payment Method Fee']),
+    deelFee: parseAmountEU(r['Deel Fee (USD)']),
+    status: (r['Payment Statement Status (Admin)']||'').trim(),
+  })).sort((a,b) => b.date.localeCompare(a.date));
+}
+
+// ============================================================
+// DATA LOADING (live fetch w/ fallback to embedded CSV snapshot)
+// ============================================================
+let GASTOS = [];
+let DEEL = [];
+let dataSource = 'loading'; // 'live' | 'fallback'
+let lastFetchTimestamp = null;
+
+async function fetchLive(){
+  const [gastosRes, deelRes] = await Promise.all([
+    fetch(csvUrl(GASTOS_SHEET_ID, GASTOS_GID), {cache:'no-store'}),
+    fetch(csvUrl(DEEL_SHEET_ID, DEEL_GID), {cache:'no-store'})
+  ]);
+  if (!gastosRes.ok || !deelRes.ok) throw new Error('HTTP ' + gastosRes.status + '/' + deelRes.status);
+  const [gastosText, deelText] = await Promise.all([gastosRes.text(), deelRes.text()]);
+  if (!gastosText || !deelText) throw new Error('Respuesta vacía');
+  return {
+    gastos: normalizeGastos(parseCSV(gastosText)),
+    deel: normalizeDeel(parseCSV(deelText))
+  };
+}
+
+function loadFallback(){
+  return {
+    gastos: normalizeGastos(parseCSV(FALLBACK_GASTOS_CSV)),
+    deel: normalizeDeel(parseCSV(FALLBACK_DEEL_CSV))
+  };
+}
+
+function setStatus(state, extra){
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  const banner = document.getElementById('fallbackBanner');
+  const lastUpdatedLine = document.getElementById('lastUpdatedLine');
+  pill.classList.remove('live','fallback','loading');
+
+  if (state === 'loading'){
+    pill.classList.add('loading');
+    text.textContent = 'Conectando con Google Sheets…';
+    return;
+  }
+  if (state === 'live'){
+    pill.classList.add('live');
+    const t = new Date().toLocaleString('es-CO', {dateStyle:'medium', timeStyle:'short'});
+    text.textContent = 'En vivo · ' + t;
+    banner.classList.remove('show');
+    lastUpdatedLine.textContent = `ÚLTIMA ACTUALIZACIÓN · ${t} · CONEXIÓN EN VIVO CON GOOGLE SHEETS`;
+  } else {
+    pill.classList.add('fallback');
+    text.textContent = 'Copia local (sin conexión en vivo)';
+    banner.classList.add('show');
+    document.getElementById('fallbackDate').textContent =
+      new Date(FALLBACK_SNAPSHOT_DATE + 'T00:00:00').toLocaleDateString('es-CO', {dateStyle:'long'});
+    document.getElementById('fallbackReason').textContent = extra ? `(${extra})` : '';
+    lastUpdatedLine.textContent = `ÚLTIMA ACTUALIZACIÓN · Copia local del ${FALLBACK_SNAPSHOT_DATE} · SIN CONEXIÓN EN VIVO`;
+  }
+}
+
+async function loadData(isManualRefresh){
+  const btn = document.getElementById('refreshBtn');
+  if (isManualRefresh){ btn.disabled = true; btn.classList.add('spinning'); }
+  setStatus('loading');
+  try {
+    const live = await fetchLive();
+    GASTOS = live.gastos;
+    DEEL = live.deel;
+    dataSource = 'live';
+    setStatus('live');
+  } catch(e){
+    const fb = loadFallback();
+    GASTOS = fb.gastos;
+    DEEL = fb.deel;
+    dataSource = 'fallback';
+    setStatus('fallback', 'motivo probable: archivo abierto localmente (file://) o sin conexión');
+    console.warn('Live fetch failed, using fallback snapshot:', e);
+  }
+  renderAll();
+  if (isManualRefresh){ btn.disabled = false; btn.classList.remove('spinning'); }
+}
+
+// ============================================================
+// CHART.JS DEFAULTS
+// ============================================================
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#58626F';
+Chart.defaults.borderColor = '#E1E7F0';
+const PALETTE_MERCURY = ['#8FB728','#C7EE4B','#5B8A1F','#A9D82E','#DDF48C','#3F6614','#B9E356','#6FA02A'];
+const PALETTE_DEEL = ['#2F5D8A','#5B87B5','#1D3F5E','#8AAAC7'];
+let charts = {};
+function destroyChart(key){ if (charts[key]){ charts[key].destroy(); delete charts[key]; } }
+
+// ============================================================
+// RENDER: RESUMEN TAB
+// ============================================================
+function renderResumen(){
+  const mercurySent = GASTOS.filter(r => r.status === 'Sent');
+  const mercuryFailed = GASTOS.filter(r => r.status === 'Failed');
+  const mercuryTotal = mercurySent.reduce((s,r) => s + r.amount, 0); // negative
+  const mercuryFailedTotal = mercuryFailed.reduce((s,r) => s + r.amount, 0);
+
+  const deelPaid = DEEL.filter(r => r.status.toLowerCase() === 'paid');
+  const deelTotal = deelPaid.reduce((s,r) => s + r.amount, 0);
+  const deelContractor = deelPaid.reduce((s,r) => s + r.contractorInvoices, 0);
+  const deelServices = deelPaid.reduce((s,r) => s + r.deelServices, 0);
+  const deelPmFee = deelPaid.reduce((s,r) => s + r.paymentMethodFee, 0);
+  const deelFee = deelPaid.reduce((s,r) => s + r.deelFee, 0);
+
+  const bankFees = Math.abs(mercurySent.filter(r=>r.category==='Bank Fees').reduce((s,r)=>s+r.amount,0));
+  const combinedTotal = Math.abs(mercuryTotal) + deelTotal;
+
+  document.getElementById('kpiStripResumen').innerHTML = `
+    <div class="kpi">
+      <div class="label">Gasto combinado total</div>
+      <div class="value">${fmtUSD(combinedTotal)}</div>
+      <div class="foot">Tarjeta (enviadas) + Deel (pagados)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Tarjeta Mercury (enviadas)</div>
+      <div class="value lime">${fmtUSD(Math.abs(mercuryTotal))}</div>
+      <div class="foot">${mercurySent.length} transacciones exitosas</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Contratistas Deel (pagados)</div>
+      <div class="value deel">${fmtUSD(deelTotal)}</div>
+      <div class="foot">${deelPaid.length} statements pagados</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Fees totales</div>
+      <div class="value warn">${fmtUSD(bankFees + deelPmFee + deelFee)}</div>
+      <div class="foot">Bank fees Mercury + fees Deel</div>
+    </div>
+  `;
+
+  document.getElementById('reconPanel').innerHTML = `
+    <h3>Conciliación de cifras</h3>
+    <p class="recon-sub">Detalle exacto de cómo se compone el gasto combinado — para verificación de Finanzas.</p>
+    <div class="recon-row">
+      <span class="rl">Tarjeta Mercury — transacciones enviadas (Sent)</span>
+      <span class="rv">${fmtUSD(Math.abs(mercuryTotal))}</span>
+    </div>
+    <div class="recon-row exclude">
+      <span class="rl">Tarjeta Mercury — transacciones fallidas (Failed)<span class="tag">no incluido en el total</span></span>
+      <span class="rv">${fmtUSD(Math.abs(mercuryFailedTotal))}</span>
+    </div>
+    <div class="recon-row">
+      <span class="rl">Deel — pagos a contratistas</span>
+      <span class="rv">${fmtUSD(deelContractor)}</span>
+    </div>
+    <div class="recon-row">
+      <span class="rl">Deel — comisión Deel Services</span>
+      <span class="rv">${fmtUSD(deelServices)}</span>
+    </div>
+    <div class="recon-row">
+      <span class="rl">Deel — fees de método de pago</span>
+      <span class="rv">${fmtUSD(deelPmFee)}</span>
+    </div>
+    <div class="recon-row total">
+      <span class="rl">Total combinado (Mercury enviadas + Deel pagados)</span>
+      <span class="rv">${fmtUSD(combinedTotal)}</span>
+    </div>
+  `;
+
+  destroyChart('compare');
+  const allMonths = [...new Set([...GASTOS.map(r=>ymOf(r.date)), ...DEEL.map(r=>ymOf(r.date))])].sort();
+  const mByMonth = {}; allMonths.forEach(m=>mByMonth[m]=0);
+  mercurySent.forEach(r => mByMonth[ymOf(r.date)] += Math.abs(r.amount));
+  const dByMonth = {}; allMonths.forEach(m=>dByMonth[m]=0);
+  deelPaid.forEach(r => dByMonth[ymOf(r.date)] += r.amount);
+
+  charts.compare = new Chart(document.getElementById('compareChart'), {
+    type: 'line',
+    data: {
+      labels: allMonths.map(monthLabel),
+      datasets: [
+        { label: 'Mercury (tarjeta)', data: allMonths.map(m=>mByMonth[m]),
+          borderColor: '#8FB728', backgroundColor: 'rgba(143,183,40,0.12)', yAxisID:'y', tension:0.3, fill:true, pointRadius:3 },
+        { label: 'Deel (contratistas)', data: allMonths.map(m=>dByMonth[m]),
+          borderColor: '#2F5D8A', backgroundColor: 'rgba(47,93,138,0.08)', yAxisID:'y1', tension:0.3, fill:true, pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{position:'bottom', labels:{boxWidth:10, padding:16}},
+        tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${fmtUSD(ctx.parsed.y)}`}}
+      },
+      scales:{
+        y:{position:'left', grid:{color:'#EDF1F7'}, ticks:{callback:fmtAxis, color:'#8FB728'}, title:{display:true, text:'Mercury (USD)', color:'#8FB728'}},
+        y1:{position:'right', grid:{display:false}, ticks:{callback:fmtAxis, color:'#2F5D8A'}, title:{display:true, text:'Deel (USD)', color:'#2F5D8A'}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+
+  document.getElementById('methodologyNotes').innerHTML = `
+    <h3>Notas de metodología</h3>
+    <ul>
+      <li><strong>Fuentes de datos:</strong> Google Sheets <a href="${GASTOS_SHEET_URL}" target="_blank" rel="noopener">"Gastos People" (Mercury)</a> y <a href="${DEEL_SHEET_URL}" target="_blank" rel="noopener">"Deel Payments"</a>.</li>
+      <li>Los montos de Mercury están expresados en USD según la columna <code>Amount</code>, que ya refleja la conversión hecha por Mercury para transacciones en moneda extranjera. La columna "Moneda original" es solo referencia informativa.</li>
+      <li>Las transacciones de tarjeta con estado <code>Failed</code> no se incluyen en ningún total — el banco nunca cobró ese monto. Se muestran por separado en la conciliación y en la pestaña Mercury para trazabilidad.</li>
+      <li>Los totales de Deel consideran únicamente statements con estado <code>paid</code>.</li>
+      <li>Por política de privacidad, se excluyen del dashboard el nombre y correo del titular de la tarjeta.</li>
+      <li>Este documento intenta conectarse en vivo a los Google Sheets originales cada vez que se abre. Si la conexión falla (por ejemplo, al abrir el archivo con doble clic en vez de alojarlo en un servidor web), se muestra una copia de respaldo claramente marcada con su fecha.</li>
+    </ul>
+  `;
+}
+
+// ============================================================
+// RENDER: MERCURY TAB
+// ============================================================
+let mercurySort = { key: 'amount', dir: 'asc' };
+
+function renderMercury(){
+  const sent = GASTOS.filter(r => r.status === 'Sent');
+  const failed = GASTOS.filter(r => r.status === 'Failed');
+  const total = sent.reduce((s,r)=>s+r.amount,0);
+  const months = [...new Set(GASTOS.map(r=>ymOf(r.date)))].sort();
+  const byMonth = {}; months.forEach(m=>byMonth[m]=0);
+  sent.forEach(r => byMonth[ymOf(r.date)] += r.amount);
+  const byCategory = {};
+  sent.forEach(r => byCategory[r.category] = (byCategory[r.category]||0)+r.amount);
+  const catSorted = Object.entries(byCategory).sort((a,b)=>a[1]-b[1]);
+  const byMerchant = {};
+  sent.forEach(r => byMerchant[r.merchantType] = (byMerchant[r.merchantType]||0)+r.amount);
+  const merchSorted = Object.entries(byMerchant).sort((a,b)=>a[1]-b[1]).slice(0,8);
+
+  document.getElementById('mercuryMeta').textContent =
+    `${months.length} meses · ${failed.length} transacciones fallidas (excluidas del total)`;
+
+  document.getElementById('kpiStripMercury').innerHTML = `
+    <div class="kpi">
+      <div class="label">Total gastado (Sent)</div>
+      <div class="value lime">${fmtUSD(Math.abs(total))}</div>
+      <div class="foot">${sent.length} transacciones exitosas</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Promedio mensual</div>
+      <div class="value">${fmtUSD(Math.abs(total)/Math.max(months.length,1))}</div>
+      <div class="foot">sobre ${months.length} meses con actividad</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Transacciones fallidas</div>
+      <div class="value warn">${failed.length}</div>
+      <div class="foot">${fmtUSD(Math.abs(failed.reduce((s,r)=>s+r.amount,0)))} no cobrados</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Bank fees (internacionales)</div>
+      <div class="value warn">${fmtUSD(Math.abs(byCategory['Bank Fees']||0))}</div>
+      <div class="foot">comisiones por transacciones intl.</div>
+    </div>
+  `;
+
+  const catColors = {};
+  catSorted.forEach(([cat],i)=>{ catColors[cat] = PALETTE_MERCURY[i % PALETTE_MERCURY.length]; });
+  const maxCatAbs = Math.max(...catSorted.map(([,v])=>Math.abs(v)), 1);
+  document.getElementById('mercuryCategoryLedger').innerHTML = catSorted.slice().reverse().map(([cat,val]) => `
+    <div>
+      <div class="ledger-row">
+        <span class="name">${cat}</span><span class="fill"></span><span class="amt">${fmtUSD(val)}</span>
+      </div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(Math.abs(val)/maxCatAbs*100).toFixed(1)}%; background:${catColors[cat]}"></div></div>
+    </div>
+  `).join('');
+
+  destroyChart('mercuryTrend');
+  charts.mercuryTrend = new Chart(document.getElementById('mercuryTrend'), {
+    type: 'bar',
+    data: { labels: months.map(monthLabel), datasets: [{ label:'Gasto mensual', data: months.map(m=>Math.abs(byMonth[m])), backgroundColor:'#C7EE4B', borderRadius:4, maxBarThickness:40 }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtUSD(ctx.parsed.y)}}},
+      scales:{ y:{grid:{color:'#EDF1F7'}, ticks:{callback:fmtAxis}}, x:{grid:{display:false}} } }
+  });
+
+  destroyChart('mercuryMerchants');
+  charts.mercuryMerchants = new Chart(document.getElementById('mercuryMerchants'), {
+    type: 'bar',
+    data: { labels: merchSorted.map(([k])=>k), datasets: [{ data: merchSorted.map(([,v])=>Math.abs(v)), backgroundColor:'#8FB728', borderRadius:4 }] },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtUSD(ctx.parsed.x)}}},
+      scales:{ x:{grid:{color:'#EDF1F7'}, ticks:{callback:fmtAxis}}, y:{grid:{display:false}} } }
+  });
+
+  destroyChart('mercuryStatus');
+  charts.mercuryStatus = new Chart(document.getElementById('mercuryStatus'), {
+    type: 'doughnut',
+    data: { labels:['Enviadas (Sent)','Fallidas (Failed)'], datasets:[{ data:[sent.length, failed.length], backgroundColor:['#1B8F5E','#B03B32'], borderColor:'#fff', borderWidth:3 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{position:'bottom', labels:{padding:16, boxWidth:10}}} }
+  });
+
+  renderMercuryTable();
+}
+
+function renderMercuryTable(){
+  const mercuryCategoryFilter = document.getElementById('mercuryCategoryFilter');
+  if (!mercuryCategoryFilter.dataset.filled){
+    const allCats = [...new Set(GASTOS.map(r=>r.category))].sort();
+    mercuryCategoryFilter.innerHTML = '<option value="">Todas las categorías</option>' + allCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    mercuryCategoryFilter.dataset.filled = '1';
+  }
+  const q = document.getElementById('mercurySearch').value.toLowerCase();
+  const cat = mercuryCategoryFilter.value;
+  const status = document.getElementById('mercuryStatusFilter').value;
+
+  let rows = GASTOS.filter(r => {
+    if (q && !r.description.toLowerCase().includes(q)) return false;
+    if (cat && r.category !== cat) return false;
+    if (status && r.status !== status) return false;
+    return true;
+  });
+  rows.sort((a,b) => {
+    let av=a[mercurySort.key], bv=b[mercurySort.key];
+    if (typeof av === 'string'){ av=av.toLowerCase(); bv=bv.toLowerCase(); }
+    if (av<bv) return mercurySort.dir==='asc'?-1:1;
+    if (av>bv) return mercurySort.dir==='asc'?1:-1;
+    return 0;
+  });
+
+  document.getElementById('mercuryCount').textContent = `${rows.length} de ${GASTOS.length}`;
+  const tbody = document.getElementById('mercuryTbody');
+  if (!rows.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Sin resultados para este filtro</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td class="desc" title="${r.description}">${r.description}</td>
+        <td>${r.category}</td>
+        <td>${r.merchantType}</td>
+        <td>${r.currency}</td>
+        <td><span class="pill ${r.status.toLowerCase()}">${r.status}</span></td>
+        <td class="num">${fmtUSD(r.amount)}</td>
+      </tr>
+    `).join('');
+  }
+  const sum = rows.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('mercuryTableSum').textContent = fmtUSD(sum);
+}
+
+// ============================================================
+// RENDER: DEEL TAB
+// ============================================================
+let deelSort = { key: 'amount', dir: 'asc' };
+
+function renderDeel(){
+  const paid = DEEL.filter(r => r.status.toLowerCase() === 'paid');
+  const total = paid.reduce((s,r)=>s+r.amount,0);
+  const contractor = paid.reduce((s,r)=>s+r.contractorInvoices,0);
+  const services = paid.reduce((s,r)=>s+r.deelServices,0);
+  const pmFee = paid.reduce((s,r)=>s+r.paymentMethodFee,0);
+  const deelFeeTotal = paid.reduce((s,r)=>s+r.deelFee,0);
+  const months = [...new Set(DEEL.map(r=>ymOf(r.date)))].sort();
+  const byMonth = {}; months.forEach(m=>byMonth[m]=0);
+  paid.forEach(r => byMonth[ymOf(r.date)] += r.amount);
+
+  document.getElementById('deelMeta').textContent = `${months.length} meses · ${fmtUSD(services)} en Deel Services`;
+
+  document.getElementById('kpiStripDeel').innerHTML = `
+    <div class="kpi">
+      <div class="label">Total pagado</div>
+      <div class="value deel">${fmtUSD(total)}</div>
+      <div class="foot">${paid.length} statements pagados</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Pagos a contratistas</div>
+      <div class="value">${fmtUSD(contractor)}</div>
+      <div class="foot">${((contractor/total)*100).toFixed(1)}% del total</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Comisión Deel Services</div>
+      <div class="value warn">${fmtUSD(services)}</div>
+      <div class="foot">${((services/total)*100).toFixed(2)}% del total</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Fees de método de pago</div>
+      <div class="value warn">${fmtUSD(pmFee + deelFeeTotal)}</div>
+      <div class="foot">costos de procesamiento</div>
+    </div>
+  `;
+
+  const comp = [
+    ['Contratistas', contractor, PALETTE_DEEL[0]],
+    ['Deel Services (comisión plataforma)', services, PALETTE_DEEL[1]],
+    ['Fees de método de pago', pmFee + deelFeeTotal, PALETTE_DEEL[2]],
+  ];
+  const maxComp = Math.max(...comp.map(d=>d[1]),1);
+  document.getElementById('deelCompositionLedger').innerHTML = comp.map(([name,val,color]) => `
+    <div>
+      <div class="ledger-row"><span class="name">${name}</span><span class="fill"></span><span class="amt">${fmtUSD(val)}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(val/maxComp*100).toFixed(1)}%; background:${color}"></div></div>
+    </div>
+  `).join('');
+
+  destroyChart('deelTrend');
+  charts.deelTrend = new Chart(document.getElementById('deelTrend'), {
+    type: 'bar',
+    data: { labels: months.map(monthLabel), datasets: [{ label:'Pagado por mes', data: months.map(m=>byMonth[m]), backgroundColor:'#2F5D8A', borderRadius:4, maxBarThickness:40 }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtUSD(ctx.parsed.y)}}},
+      scales:{ y:{grid:{color:'#EDF1F7'}, ticks:{callback:fmtAxis}}, x:{grid:{display:false}} } }
+  });
+
+  renderDeelTable();
+}
+
+function renderDeelTable(){
+  const deelStatusFilter = document.getElementById('deelStatusFilter');
+  if (!deelStatusFilter.dataset.filled){
+    const allStatuses = [...new Set(DEEL.map(r=>r.status))].sort();
+    deelStatusFilter.innerHTML = '<option value="">Todos los estados</option>' + allStatuses.map(s=>`<option value="${s}">${s}</option>`).join('');
+    deelStatusFilter.dataset.filled = '1';
+  }
+  const q = document.getElementById('deelSearch').value.toLowerCase();
+  const status = deelStatusFilter.value;
+
+  let rows = DEEL.filter(r => {
+    if (q && !(r.id.toLowerCase().includes(q) || r.date.includes(q))) return false;
+    if (status && r.status !== status) return false;
+    return true;
+  });
+  rows.sort((a,b) => {
+    let av=a[deelSort.key], bv=b[deelSort.key];
+    if (typeof av === 'string'){ av=av.toLowerCase(); bv=bv.toLowerCase(); }
+    if (av<bv) return deelSort.dir==='asc'?-1:1;
+    if (av>bv) return deelSort.dir==='asc'?1:-1;
+    return 0;
+  });
+
+  document.getElementById('deelCount').textContent = `${rows.length} de ${DEEL.length}`;
+  const tbody = document.getElementById('deelTbody');
+  if (!rows.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Sin resultados para este filtro</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.id}</td>
+        <td>${r.currency}</td>
+        <td class="num">${fmtUSD(r.contractorInvoices)}</td>
+        <td class="num">${fmtUSD(r.deelServices)}</td>
+        <td class="num">${fmtUSD(r.paymentMethodFee)}</td>
+        <td><span class="pill ${r.status.toLowerCase()}">${r.status}</span></td>
+        <td class="num">${fmtUSD(r.amount)}</td>
+      </tr>
+    `).join('');
+  }
+  const sum = rows.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('deelTableSum').textContent = fmtUSD(sum);
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll(){
+  renderResumen();
+  renderMercury();
+  renderDeel();
+}
+
+// ============================================================
+// EVENTS: tabs, filters, sorting, refresh
+// ============================================================
+document.querySelectorAll('.tabbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.getElementById('mercurySearch').addEventListener('input', renderMercuryTable);
+document.getElementById('mercuryCategoryFilter').addEventListener('change', renderMercuryTable);
+document.getElementById('mercuryStatusFilter').addEventListener('change', renderMercuryTable);
+document.querySelectorAll('#mercuryTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    mercurySort = (mercurySort.key === key) ? {key, dir: mercurySort.dir==='asc'?'desc':'asc'} : {key, dir:'asc'};
+    document.querySelectorAll('#mercuryTable thead th').forEach(h=>h.classList.remove('sorted','asc'));
+    th.classList.add('sorted'); if (mercurySort.dir==='asc') th.classList.add('asc');
+    renderMercuryTable();
+  });
+});
+
+document.getElementById('deelSearch').addEventListener('input', renderDeelTable);
+document.getElementById('deelStatusFilter').addEventListener('change', renderDeelTable);
+document.querySelectorAll('#deelTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    deelSort = (deelSort.key === key) ? {key, dir: deelSort.dir==='asc'?'desc':'asc'} : {key, dir:'asc'};
+    document.querySelectorAll('#deelTable thead th').forEach(h=>h.classList.remove('sorted','asc'));
+    th.classList.add('sorted'); if (deelSort.dir==='asc') th.classList.add('asc');
+    renderDeelTable();
+  });
+});
+
+document.getElementById('refreshBtn').addEventListener('click', () => loadData(true));
+
+// ============================================================
+// INIT
+// ============================================================
+loadData(false);
+
+</script>
+</body>
+</html>
